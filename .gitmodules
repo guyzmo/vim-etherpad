@@ -1,0 +1,6 @@
+[submodule "pylibs/PyEtherpadLite"]
+	path = pylibs/PyEtherpadLite
+	url = https://github.com/guyzmo/PyEtherpadLite.git
+[submodule "pylibs/socketIO-client"]
+	path = pylibs/socketIO-client
+	url = https://github.com/guyzmo/socketIO-client.git
