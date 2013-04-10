@@ -149,6 +149,7 @@ let g:epad_host = "localhost"
 let g:epad_port = "9001"
 let g:epad_path = "p/"
 let g:epad_verbose = 0 " set to 1 for low verbosity, 2 for debug verbosity
+let g:epad_updatetime = 1000
 
 autocmd CursorHold * call Timer()
 function! Timer()
@@ -176,7 +177,10 @@ except ImportError:
     from socketIO_client import SocketIO
     from py_etherpad import EtherpadIO, Style
 
-pyepad_env = {'epad': None, 'text': None, 'updated': False}
+pyepad_env = {'epad': None,
+              'text': None,
+              'updated': False,
+              'updatetime': 0}
 
 def _update_buffer():
     """
@@ -224,6 +228,8 @@ def _launch_epad(padid=None, host=None, port=None, path=None, verbose=None, *arg
     # disable cursorcolumn and cursorline that interferes with syntax
     vim.command('set nocursorcolumn')
     vim.command('set nocursorline')
+    pyepad_env['updatetime'] = vim.eval('&updatetime')
+    vim.command('set updatetime='+vim.eval('g:epad_updatetime'))
 
     def vim_link(text):
         """
@@ -240,6 +246,7 @@ def _launch_epad(padid=None, host=None, port=None, path=None, verbose=None, *arg
         on disconnection of the Etherpad Lite Server
         """
         vim.command('echoerr "disconnected from Etherpad"')
+        vim.command('set updatetime='+pyepad_env['updatetime'])
 
     try:
         pyepad_env['epad'] = EtherpadIO(padid, vim_link, host, path, port, verbose, 
