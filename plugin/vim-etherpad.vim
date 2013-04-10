@@ -105,18 +105,39 @@ def _update_buffer():
         vim.command('redraw!')
         pyepad_env['updated'] = False
 
-def _launch_epad(padid=None, host=None, port=None, path=None, verbose=None, *args):
+def _launch_epad(padid=None, verbose=None, *args):
     """
     launches EtherpadLiteClient
     """
-    if not padid:
+    def parse_args(padid):
+        protocol, padid = padid.split('://')
+        secure = False
+        port = "80"
+        if protocol == "https":
+            secure = True
+            port = "443"
+        padid = padid.split('/')
+        host = padid[0]
+        if ':' in host:
+            host, port = host.split(':')
+        path = ""
+        if len(padid) > 2:
+            path = "/".join(padid[1:-1])+'/'
+        padid = padid[-1]
+        return secure, host, port, path, padid
+
+    host = vim.eval('g:epad_host')
+    port = vim.eval('g:epad_port')
+    path = vim.eval('g:epad_path')
+    secure = False
+    if padid:
+        if not padid.startswith('http'):
+            padid = padid
+        else:
+            secure, host, port, path, padid = parse_args(padid)
+    else:
         padid = vim.eval('g:epad_pad')
-    if not host:
-        host = vim.eval('g:epad_host')
-    if not port:
-        port = vim.eval('g:epad_port')
-    if not path:
-        path = vim.eval('g:epad_path')
+
     if not verbose:
         verbose = vim.eval('g:epad_verbose')
     verbose = int(verbose)
@@ -152,17 +173,18 @@ def _launch_epad(padid=None, host=None, port=None, path=None, verbose=None, *arg
         vim.command('set updatetime='+pyepad_env['updatetime'])
 
     try:
-        pyepad_env['epad'] = EtherpadIO(padid, vim_link, host, path, port, verbose, 
+        pyepad_env['epad'] = EtherpadIO(padid, vim_link, host, path, port, 
+                                        secure, verbose, 
                                         transports=['websocket', 'xhr-polling'], 
                                         disc_cb=on_disconnect)
 
         if not pyepad_env['epad'].has_ended():
-            vim.command('echomsg "connected to Etherpad: http://%s:%s/%s%s"' % (host, port, path, padid))
+            vim.command('echomsg "connected to Etherpad: %s://%s:%s/%s%s"' % ('https' if secure else 'http', host, port, path, padid))
         else:
             vim.command('echoerr "not connected to Etherpad"')
 
     except Exception, err:
-        vim.command('echoerr "Couldn\'t connect to Etherpad: http://%s:%s/%s%s"' % (host, port, path, padid))
+        vim.command('echoerr "Couldn\'t connect to Etherpad: %s://%s:%s/%s%s"' % ('https' if secure else 'http', host, port, path, padid))
 
 def _pause_epad():
     """
