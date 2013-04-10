@@ -152,6 +152,8 @@ def _launch_epad(padid=None, verbose=None, *args):
     # disable cursorcolumn and cursorline that interferes with syntax
     vim.command('set nocursorcolumn')
     vim.command('set nocursorline')
+    pyepad_env['buftype'] = vim.eval('&buftype')
+    vim.command('set buftype=nofile')
     pyepad_env['updatetime'] = vim.eval('&updatetime')
     vim.command('set updatetime='+vim.eval('g:epad_updatetime'))
 
@@ -171,6 +173,7 @@ def _launch_epad(padid=None, verbose=None, *args):
         """
         vim.command('echoerr "disconnected from Etherpad"')
         vim.command('set updatetime='+pyepad_env['updatetime'])
+        vim.command('set buftype='+pyepad_env['buftype'])
 
     try:
         pyepad_env['epad'] = EtherpadIO(padid, vim_link, host, path, port, 
