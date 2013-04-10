@@ -54,10 +54,10 @@ pyepad_env = {'epad': None,
               'colors': []}
 
 def calculate_fg(bg):
+    # http://stackoverflow.com/questions/3942878/how-to-decide-font-color-in-white-or-black-depending-on-background-color
     if bg.startswith('#'):
         r, g, b = (int(bg[1:3], 16), int(bg[3:5], 16), int(bg[5:-1], 16))
-        print "AOEU", bg, r, g, b, (r*0.299+b*0.587+g*0.114)
-        if (r*0.299+b*0.587+g*0.114) > 90:
+        if (r*0.299+b*0.587+g*0.114) > 50:
             return "#000000"
     return "#ffffff"
 
