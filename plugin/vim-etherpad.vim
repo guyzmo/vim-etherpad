@@ -173,7 +173,7 @@ def _stop_epad(*args):
     Function that disconnects EtherpadLiteClient from the server
     """
     if pyepad_env['epad'] and not pyepad_env['epad'].has_ended():
-        pyepad_env['epad'].disconnect()
+        pyepad_env['epad'].stop()
 
 EOS
 
