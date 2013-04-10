@@ -71,10 +71,25 @@ def _update_buffer():
         text_str = pyepad_env['text'].decorated(style=Style.STYLES['Raw']())
         vim.current.buffer[:] = [l.encode('utf-8') for l in text_str.splitlines()]
         c, l = (1, 1)
+        vim.command('syn clear EpadBold')
+        vim.command('syn clear EpadItalic')
+        vim.command('syn clear EpadUnderline')
+        vim.command('syn clear EpadStrike')
         for i in range(0,len(pyepad_env['colors'])):
             vim.command('syn clear EpadAuthor%d' % i)
             vim.command('hi clear EpadColorAuthor%d' % i)
         for i in range(0, len(text_obj)):
+            attr = text_obj.get_attr(i)
+            if len(attr) > 0:
+                for attr in attr:
+                    if attr[0] == 'bold':
+                        vim.command('syn match EpadBold /\%'+str(l)+'l\%'+str(c)+'c./')
+                    elif attr[0] == 'italic':
+                        vim.command('syn match EpadItalic /\%'+str(l)+'l\%'+str(c)+'c./')
+                    elif attr[0] == 'underline':
+                        vim.command('syn match EpadUnderline /\%'+str(l)+'l\%'+str(c)+'c./')
+                    elif attr[0] == 'strikethrough':
+                        vim.command('syn match EpadStrike /\%'+str(l)+'l\%'+str(c)+'c./')
             color = text_obj.get_author_color(i)
             if color:
                 if not color in pyepad_env['colors']:
@@ -82,7 +97,7 @@ def _update_buffer():
                 color_idx = pyepad_env['colors'].index(color)
                 vim.command('hi EpadColorAuthor%d  guibg=%s guifg=%s' % (color_idx, color, calculate_fg(color)))
                 vim.command('hi def link EpadAuthor%d  EpadColorAuthor%d' % (color_idx, color_idx))
-                vim.command('syn match EpadAuthor'+str(color_idx)+' /\%'+str(l)+'l\%'+str(c)+'c./')
+                vim.command('syn match EpadAuthor'+str(color_idx)+' /\%'+str(l)+'l\%'+str(c)+'c./ contains=EpadBold,EpadItalic,EpadUnderline,EpadStrike')
             c += 1
             if text_obj.get_char(i) == '\n':
                 l += 1
