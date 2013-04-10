@@ -144,7 +144,19 @@ hi def link EpadAuthor61 EpadColorAuthor61
 hi def link EpadAuthor62 EpadColorAuthor62
 hi def link EpadAuthor63 EpadColorAuthor63
 
+let g:epad_pad = "test"
+let g:epad_host = "localhost"
+let g:epad_port = "9001"
+let g:epad_path = "p/"
+let g:epad_verbose = 0 " set to 1 for low verbosity, 2 for debug verbosity
 
+autocmd CursorHold * call Timer()
+function! Timer()
+  call feedkeys("f\e")
+  " K_IGNORE keycode does not work after version 7.2.025)
+  " there are numerous other keysequences that you can use
+  py _update_buffer()
+endfunction
 
 python << EOS
 import difflib
@@ -164,40 +176,69 @@ except ImportError:
     from socketIO_client import SocketIO
     from py_etherpad import EtherpadIO, Style
 
-pyepad_env = {'epad': None, 'text': None}
+pyepad_env = {'epad': None, 'text': None, 'updated': False}
 
-def _launch_epad(*args):
-    padid = "test"
-    host = "localhost"
-    port = "9001"
-    path = "p/"
-    verbose = False
+def _update_buffer():
+    """
+    This function is polled by vim to updated its current buffer
+    """
+    if pyepad_env['updated']:
+        text_obj = pyepad_env['text']
+        text_str = pyepad_env['text'].decorated(style=Style.STYLES['Raw']())
+        vim.current.buffer[:] = [l.encode('utf-8') for l in text_str.splitlines()]
+        c, l = (1, 1)
+        for i in range(0, 63):
+            vim.command('syn clear EpadAuthor'+str(i))
+        for i in range(0, len(text_obj)):
+            attr = text_obj.get_author_idx(i)
+            vim.command('syn match EpadAuthor'+str(attr)+' /\%'+str(l)+'l\%'+str(c)+'c./')
+            c += 1
+            if text_obj.get_char(i) == '\n':
+                l += 1
+                c = 0
+        vim.command('redraw!')
 
-    logging.basicConfig()
-    logging.root.setLevel(logging.DEBUG)
+def _launch_epad(padid=None, host=None, port=None, path=None, verbose=None, *args):
+    """
+    launches EtherpadLiteClient
+    """
+    if not padid:
+        padid = vim.eval('g:epad_pad')
+    if not host:
+        host = vim.eval('g:epad_host')
+    if not port:
+        port = vim.eval('g:epad_port')
+    if not path:
+        path = vim.eval('g:epad_path')
+    if not verbose:
+        verbose = vim.eval('g:epad_verbose')
+    verbose = int(verbose)
 
+    if verbose:
+        logging.basicConfig()
+        if verbose is 1:
+            logging.root.setLevel(logging.INFO)
+        elif verbose is 2:
+            logging.root.setLevel(logging.DEBUG)
+
+    # disable cursorcolumn and cursorline that interferes with syntax
     vim.command('set nocursorcolumn')
     vim.command('set nocursorline')
 
     def vim_link(text):
-        # print "vim_link for %s" % str(text)
+        """
+        callback function that is called by EtherpadLiteClient
+        it stores the last updated text
+        """
         if not text is None:
             pyepad_env['text'] = text
-            text = text.decorated(style=Style.STYLES['Raw']())
-            vim.current.buffer[:] = [l.encode('utf-8') for l in text.splitlines()]
-            c, l = (1, 1)
-            for i in range(0, 63):
-                vim.command('syn clear EpadAuthor'+str(i))
-            for i in range(0, len(pyepad_env['text'])):
-                attr = pyepad_env['text'].get_author_idx(i)
-                vim.command('syn match EpadAuthor'+str(attr)+' /\%'+str(l)+'l\%'+str(c)+'c./')
-                c += 1
-                if pyepad_env['text'].get_char(i) == '\n':
-                    l += 1
-                    c = 0
-            vim.command('redraw!')
+            pyepad_env['updated'] = True
 
     def on_disconnect():
+        """
+        callback function that is called by EtherpadLiteClient 
+        on disconnection of the Etherpad Lite Server
+        """
         vim.command('echoerr "disconnected from Etherpad"')
 
     try:
@@ -211,16 +252,21 @@ def _launch_epad(*args):
             vim.command('echoerr "not connected to Etherpad"')
 
     except Exception, err:
-        print err
         vim.command('echoerr "Couldn\'t connect to Etherpad: http://%s:%s/%s%s"' % (host, port, path, padid))
 
 def _pause_epad():
+    """
+    Function that pauses EtherpadLiteClient
+    """
     if not pyepad_env['epad'].has_ended():
         pyepad_env['epad'].pause()
     else:
         vim.command('echoerr "not connected to Etherpad"')
 
 def _vim_to_epad_update():
+    """
+    Function that sends all buffers updates to the EtherpadLite server
+    """
     if not pyepad_env['epad'].has_ended():
         pyepad_env['epad'].patch_text(pyepad_env['text'], "\n".join(vim.current.buffer[:]))
     else:
@@ -228,6 +274,9 @@ def _vim_to_epad_update():
 
 
 def _stop_epad(*args):
+    """
+    Function that disconnects EtherpadLiteClient from the server
+    """
     if pyepad_env['epad'] and not pyepad_env['epad'].has_ended():
         pyepad_env['epad'].disconnect()
 
