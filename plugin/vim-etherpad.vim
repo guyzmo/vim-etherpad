@@ -250,7 +250,7 @@ def _launch_epad(padid=None, host=None, port=None, path=None, verbose=None, *arg
 
     try:
         pyepad_env['epad'] = EtherpadIO(padid, vim_link, host, path, port, verbose, 
-                                        transports=['websocket'], 
+                                        transports=['websocket', 'xhr-polling'], 
                                         disc_cb=on_disconnect)
 
         if not pyepad_env['epad'].has_ended():
