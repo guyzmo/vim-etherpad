@@ -185,7 +185,7 @@ def _launch_epad(*args):
             pyepad_env['text'] = text
             text = text.decorated(style=Style.STYLES['Raw']())
             vim.current.buffer[:] = [l.encode('utf-8') for l in text.splitlines()]
-            c, l = (0, 0)
+            c, l = (1, 1)
             for i in range(0, 63):
                 vim.command('syn clear EpadAuthor'+str(i))
             for i in range(0, len(pyepad_env['text'])):
