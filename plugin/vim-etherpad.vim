@@ -141,12 +141,16 @@ def _launch_epad(padid=None, verbose=None, *args):
         verbose = vim.eval('g:epad_verbose')
     verbose = int(verbose)
 
+    logging.basicConfig()
     if verbose:
-        logging.basicConfig()
         if verbose is 1:
             logging.root.setLevel(logging.INFO)
         elif verbose is 2:
             logging.root.setLevel(logging.DEBUG)
+        else:
+            logging.root.setLevel(logging.WARN)
+    else:
+        logging.root.setLevel(logging.WARN)
 
     # disable cursorcolumn and cursorline that interferes with syntax
     vim.command('set nocursorcolumn')
