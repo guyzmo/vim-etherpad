@@ -4,22 +4,13 @@ if exists('g:loaded_vim_etherpad') || &cp
 endif
 let g:loaded_vim_etherpad = 1
 
-hi EpadAttrBold      term=bold      gui=bold
-hi EpadAttrItalic    term=italic    gui=italic
-hi EpadAttrUnderline term=underline gui=underline
-hi EpadAttrStrike    term=reverse   gui=reverse
-
-hi def link EpadBold      EpadAttrBold
-hi def link EpadItalic    EpadAttrItalic
-hi def link EpadUnderline EpadAttrUnderline
-hi def link EpadStrike    EpadAttrStrike
-
 let g:epad_pad = "test"
 let g:epad_host = "localhost"
 let g:epad_port = "9001"
 let g:epad_path = "p/"
 let g:epad_verbose = 0 " set to 1 for low verbosity, 2 for debug verbosity
-let g:epad_updatetime = 1000
+let g:epad_attributes = 1 " set to 1 for showing attributes
+let g:epad_updatetime = 200
 
 autocmd CursorHold * call Timer()
 function! Timer()
@@ -53,6 +44,11 @@ pyepad_env = {'epad': None,
               'updatetime': 0,
               'colors': []}
 
+attr_trans = {'bold':          'bold',
+              'italic':        'italic',
+              'underline':     'underline',
+              'strikethrough': 'undercurl'}
+
 def calculate_fg(bg):
     # http://stackoverflow.com/questions/3942878/how-to-decide-font-color-in-white-or-black-depending-on-background-color
     if bg.startswith('#'):
@@ -71,33 +67,36 @@ def _update_buffer():
         text_str = pyepad_env['text'].decorated(style=Style.STYLES['Raw']())
         vim.current.buffer[:] = [l.encode('utf-8') for l in text_str.splitlines()]
         c, l = (1, 1)
-        vim.command('syn clear EpadBold')
-        vim.command('syn clear EpadItalic')
-        vim.command('syn clear EpadUnderline')
-        vim.command('syn clear EpadStrike')
-        for i in range(0,len(pyepad_env['colors'])):
-            vim.command('syn clear EpadAuthor%d' % i)
-            vim.command('hi clear EpadColorAuthor%d' % i)
+        for hilight in pyepad_env['colors']:
+            vim.command('syn clear %s' % hilight)
         for i in range(0, len(text_obj)):
             attr = text_obj.get_attr(i)
-            if len(attr) > 0:
-                for attr in attr:
-                    if attr[0] == 'bold':
-                        vim.command('syn match EpadBold /\%'+str(l)+'l\%'+str(c)+'c./')
-                    elif attr[0] == 'italic':
-                        vim.command('syn match EpadItalic /\%'+str(l)+'l\%'+str(c)+'c./')
-                    elif attr[0] == 'underline':
-                        vim.command('syn match EpadUnderline /\%'+str(l)+'l\%'+str(c)+'c./')
-                    elif attr[0] == 'strikethrough':
-                        vim.command('syn match EpadStrike /\%'+str(l)+'l\%'+str(c)+'c./')
             color = text_obj.get_author_color(i)
             if color:
-                if not color in pyepad_env['colors']:
-                    pyepad_env['colors'].append(color)
-                color_idx = pyepad_env['colors'].index(color)
-                vim.command('hi EpadColorAuthor%d  guibg=%s guifg=%s' % (color_idx, color, calculate_fg(color)))
-                vim.command('hi def link EpadAuthor%d  EpadColorAuthor%d' % (color_idx, color_idx))
-                vim.command('syn match EpadAuthor'+str(color_idx)+' /\%'+str(l)+'l\%'+str(c)+'c./ contains=EpadBold,EpadItalic,EpadUnderline,EpadStrike')
+                # because colors can't be combined, here is a workaround,
+                # see http://stackoverflow.com/questions/15974439/superpose-two-vim-syntax-matches-on-the-same-character
+                if len(attr) > 0 and vim.eval('g:epad_attributes') != "0":
+                    vimattr = map(lambda x: x[0], sorted(attr))
+                    colorname = "Epad"+ color[1:] + "_" + reduce(lambda x, y: x+y.capitalize(), vimattr)
+                    vimattr = ",".join([attr_trans[attr] for attr in vimattr])
+                    if not colorname in pyepad_env['colors']:
+                        pyepad_env['colors'].append(colorname)
+                        vim.command('hi %(cname)s guibg=%(bg)s '\
+                                    'guifg=%(fg)s gui=%(attr)s '\
+                                    'term=%(attr)s' % dict(cname=colorname, 
+                                                           fg=calculate_fg(color),
+                                                           bg=color,
+                                                           attr=vimattr))
+                else:
+                    colorname = "Epad"+ color[1:]
+                    if not colorname in pyepad_env['colors']:
+                        pyepad_env['colors'].append(colorname)
+                        vim.command('hi %(cname)s guibg=%(bg)s '\
+                                     'guifg=%(fg)s' % dict(cname=colorname, 
+                                                           fg=calculate_fg(color),
+                                                           bg=color))
+                vim.command('syn match %s ' % (colorname,)
+                            +'/\%'+str(l)+'l\%'+str(c)+'c./')
             c += 1
             if text_obj.get_char(i) == '\n':
                 l += 1
@@ -215,11 +214,24 @@ def _stop_epad(*args):
     if pyepad_env['epad'] and not pyepad_env['epad'].has_ended():
         pyepad_env['epad'].stop()
 
+def _toggle_attributes(*args):
+    if len(args) > 0:
+        if args[0] == "0":
+            vim.command('let g:epad_attributes = 0')
+        else:
+            vim.command('let g:epad_attributes = 1')
+    elif vim.eval('g:epad_attributes') == "0":
+        vim.command('let g:epad_attributes = 1')
+    else:
+        vim.command('let g:epad_attributes = 0')
+    pyepad_env['updated'] = True
+
 EOS
 
 command! -nargs=* Etherpad :python _launch_epad(<f-args>)
 command! -nargs=* EtherpadStop :python _stop_epad(<f-args>)
 command! -nargs=* EtherpadPause :python _pause_epad(<f-args>)
 command! -nargs=* EtherpadUpdate :python _vim_to_epad_update(<f-args>)
+command! -nargs=* EtherpadShowAttributes :python _toggle_attributes(<f-args>)
 
 
