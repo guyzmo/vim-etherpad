@@ -38,9 +38,11 @@ To run the plugin for dev or testing, you can launch vim as follows:
     let g:epad_path = "p/"        " URL Path to the pad
     let g:epad_pad = "foo"        " Name of the pad to connect to
     
+    let g:epad_updatetime = 1000  " lower this for more realtime, higher this for less load
+    let g:epad_attributes = 0     " set to 1 to display attributes (works only with a fonth that)
+
     " Enable verbosity
     let g:epad_verbose = 0        " set to 1 for INFO level, 2 for DEBUG level
-    leg g:epad_updatetime = 1000  " lower this for more realtime, higher this for less load
 
 # Use
 
@@ -55,13 +57,21 @@ To run the plugin for dev or testing, you can launch vim as follows:
 
     :EtherpadStop
     
-## To pause current pad connection:
+## To pause (or resume) current pad connection:
 
     :EtherpadPause
     
 ## To try sending an update (will fail, changeset building library is work in progress):
 
+make some edits and then:
+
     :EtherpadUpdate
+
+## To toggle (or set) display of attributes:
+
+    :EtherpadShowAttributes   " toggle attributes
+    :EtherpadShowAttributes 0 " disable attributes
+    :EtherpadShowAttributes 1 " show attributes
 
 # Install
 
