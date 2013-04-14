@@ -82,6 +82,15 @@ def _update_buffer():
             attr = text_obj.get_attr(i)
             color = text_obj.get_author_color(i)
             cursor = text_obj.get_cursor(c-1, l-1)
+            if cursor:
+                cursorcolor = text_obj._authors.get_color(cursor)
+                cursorcolor = calculate_bright(cursorcolor)
+                cursorname = "Epad"+ cursorcolor[:]
+                pyepad_env['colors'].append(cursorname)
+                vim.command('hi %(cname)s guibg=%(bg)s '\
+                            'guifg=%(fg)s ' % dict(cname=cursorname, 
+                                                    fg=calculate_fg(cursorcolor),
+                                                    bg=cursorcolor))
             if color:
                 # because colors can't be combined, here is a workaround,
                 # see http://stackoverflow.com/questions/15974439/superpose-two-vim-syntax-matches-on-the-same-character
@@ -89,15 +98,6 @@ def _update_buffer():
                     vimattr = map(lambda x: x[0], sorted(attr))
                     colorname = "Epad"+ color[1:] + "_" + reduce(lambda x, y: x+y.capitalize(), vimattr)
                     vimattr = ",".join([attr_trans[attr] for attr in vimattr])
-                    if cursor:
-                        cursorcolor = text_obj._authors.get_color(cursor)
-                        cursorcolor = calculate_bright(cursorcolor)
-                        cursorname = "Epad"+ cursorcolor[:]
-                        pyepad_env['colors'].append(cursorname)
-                        vim.command('hi %(cname)s guibg=%(bg)s '\
-                                    'guifg=%(fg)s ' % dict(cname=cursorname, 
-                                                           fg=calculate_fg(cursorcolor),
-                                                           bg=cursorcolor))
                     if not colorname in pyepad_env['colors']:
                         pyepad_env['colors'].append(colorname)
                         vim.command('hi %(cname)s guibg=%(bg)s '\
@@ -116,10 +116,10 @@ def _update_buffer():
                                                            bg=color))
                 if cursor:
                     vim.command('syn match %s ' % (cursorname,)
-                                +'/\%'+str(l)+'l\%'+str(c)+'c./')
+                                +'/\%'+str(l)+'l\%'+str(c)+'c\(.\|$\)/')
                 else:
                     vim.command('syn match %s ' % (colorname,)
-                                +'/\%'+str(l)+'l\%'+str(c)+'c./')
+                                +'/\%'+str(l)+'l\%'+str(c)+'c\(.\|$\)/')
             c += 1
             if text_obj.get_char(i) == '\n':
                 l += 1
