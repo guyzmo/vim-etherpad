@@ -42,12 +42,14 @@ pyepad_env = {'epad': None,
               'text': None,
               'updated': False,
               'updatetime': 0,
-              'colors': []}
+              'colors': [],
+              'cursors': []}
 
 attr_trans = {'bold':          'bold',
               'italic':        'italic',
               'underline':     'underline',
-              'strikethrough': 'undercurl'}
+              'strikethrough': 'undercurl',
+              'list':          'list'}
 
 def calculate_fg(bg):
     # http://stackoverflow.com/questions/3942878/how-to-decide-font-color-in-white-or-black-depending-on-background-color
@@ -59,7 +61,7 @@ def calculate_fg(bg):
 
 def calculate_bright(color):
     if color.startswith('#'):
-        r, g, b =  (int(color[1:3], 16)+32, int(color[3:5], 16)+32, int(color[5:], 16)+32)
+        r, g, b =  (int(color[1:3], 16)+64, int(color[3:5], 16)+64, int(color[5:], 16)+64)
         if r > 255: r = 0xff
         if g > 255: g = 0xff
         if b > 255: b = 0xff
@@ -78,6 +80,9 @@ def _update_buffer():
         c, l = (1, 1)
         for hilight in pyepad_env['colors']:
             vim.command('syn clear %s' % hilight)
+        for i in pyepad_env['cursors']:
+            vim.command('call matchdelete(%s)' % (i))
+        pyepad_env['cursors'] = []
         for i in range(0, len(text_obj)):
             attr = text_obj.get_attr(i)
             color = text_obj.get_author_color(i)
@@ -85,7 +90,7 @@ def _update_buffer():
             if cursor:
                 cursorcolor = text_obj._authors.get_color(cursor)
                 cursorcolor = calculate_bright(cursorcolor)
-                cursorname = "Epad"+ cursorcolor[:]
+                cursorname = "Epad"+ cursorcolor[1:]
                 pyepad_env['colors'].append(cursorname)
                 vim.command('hi %(cname)s guibg=%(bg)s '\
                             'guifg=%(fg)s ' % dict(cname=cursorname, 
@@ -115,8 +120,9 @@ def _update_buffer():
                                                            fg=calculate_fg(color),
                                                            bg=color))
                 if cursor:
-                    vim.command('syn match %s ' % (cursorname,)
-                                +'/\%'+str(l)+'l\%'+str(c)+'c\(.\|$\)/')
+                    pyepad_env['cursors'].append(vim.eval("matchadd('%s', '%s')" % (cursorname,
+                                                                    '\%'+str(l)+'l\%'+str(c)+'c')
+                                                ))
                 else:
                     vim.command('syn match %s ' % (colorname,)
                                 +'/\%'+str(l)+'l\%'+str(c)+'c\(.\|$\)/')
