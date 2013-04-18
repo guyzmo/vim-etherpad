@@ -27,6 +27,10 @@ import vim
 import sys
 import os
 
+def excepthook(*args):
+    print 'caught', args
+sys.excepthook = excepthook
+
 path = os.path.dirname(vim.eval('expand("<sfile>")'))
 
 try:
