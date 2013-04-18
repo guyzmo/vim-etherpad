@@ -235,7 +235,7 @@ def _vim_to_epad_update():
     Function that sends all buffers updates to the EtherpadLite server
     """
     if not pyepad_env['epad'].has_ended():
-        pyepad_env['epad'].patch_text(pyepad_env['text'], "\n".join(vim.current.buffer[:]))
+        pyepad_env['new_rev'] = (pyepad_env['text'], "\n".join(vim.current.buffer[:])+"\n")
     else:
         vim.command('echoerr "not connected to Etherpad"')
 
