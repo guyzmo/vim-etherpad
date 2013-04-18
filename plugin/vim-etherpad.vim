@@ -9,16 +9,9 @@ let g:epad_host = "localhost"
 let g:epad_port = "9001"
 let g:epad_path = "p/"
 let g:epad_verbose = 0 " set to 1 for low verbosity, 2 for debug verbosity
+let g:epad_authors = 1 " set to 1 for showing authors
 let g:epad_attributes = 1 " set to 1 for showing attributes
 let g:epad_updatetime = 200
-
-autocmd CursorHold * call Timer()
-function! Timer()
-  call feedkeys("f\e")
-  " K_IGNORE keycode does not work after version 7.2.025)
-  " there are numerous other keysequences that you can use
-  py _update_buffer()
-endfunction
 
 python << EOS
 import difflib
@@ -108,11 +101,11 @@ def _update_buffer():
             if color:
                 # because colors can't be combined, here is a workaround,
                 # see http://stackoverflow.com/questions/15974439/superpose-two-vim-syntax-matches-on-the-same-character
-                if len(attr) > 0 and vim.eval('g:epad_attributes') != "0":
+                if len(attr) > 0:
                     vimattr = map(lambda x: x[0], sorted(attr))
                     colorname = "Epad"+ color[1:] + "_" + reduce(lambda x, y: x+y.capitalize(), vimattr)
                     vimattr = ",".join([attr_trans[attr] for attr in vimattr])
-                    if not colorname in pyepad_env['colors']:
+                    if not colorname in pyepad_env['colors'] and vim.eval('g:epad_authors') != "0":
                         pyepad_env['colors'].append(colorname)
                         vim.command('hi %(cname)s guibg=%(bg)s '\
                                     'guifg=%(fg)s gui=%(attr)s '\
@@ -120,6 +113,11 @@ def _update_buffer():
                                                            fg=calculate_fg(color),
                                                            bg=color,
                                                            attr=vimattr))
+                    else:
+                        pyepad_env['colors'].append(colorname)
+                        vim.command('hi %(cname)s '\
+                                    ' gui=%(attr)s term=%(attr)s' % dict(cname=colorname,
+                                                                         attr=vimattr))
                 else:
                     colorname = "Epad"+ color[1:]
                     if not colorname in pyepad_env['colors']:
@@ -132,7 +130,7 @@ def _update_buffer():
                     pyepad_env['cursors'].append(vim.eval("matchadd('%s', '%s')" % (cursorname,
                                                                     '\%'+str(l)+'l\%'+str(c)+'c')
                                                 ))
-                else:
+                elif vim.eval('g:epad_attributes') != "0" and vim.eval('g:epad_authors') != "0":
                     vim.command('syn match %s ' % (colorname,)
                                 +'/\%'+str(l)+'l\%'+str(c)+'c\(.\|$\)/')
             c += 1
@@ -243,10 +241,11 @@ def _vim_to_epad_update():
     """
     Function that sends all buffers updates to the EtherpadLite server
     """
-    if not pyepad_env['epad'].has_ended():
-        pyepad_env['new_rev'] = (pyepad_env['text'], "\n".join(vim.current.buffer[:])+"\n")
-    else:
-        vim.command('echoerr "not connected to Etherpad"')
+    if not pyepad_env['updated']:
+        if not pyepad_env['epad'].has_ended():
+            pyepad_env['new_rev'] = (pyepad_env['text'], "\n".join(vim.current.buffer[:])+"\n")
+        else:
+            vim.command('echoerr "not connected to Etherpad"')
 
 
 def _stop_epad(*args):
@@ -268,6 +267,40 @@ def _toggle_attributes(*args):
         vim.command('let g:epad_attributes = 0')
     pyepad_env['updated'] = True
 
+def _toggle_authors(*args):
+    print "AU", args
+    if len(args) > 0:
+        if args[0] == "0":
+            print "set with arg to 0"
+            vim.command('let g:epad_authors = 0')
+        else:
+            print "set with arg to 1"
+            vim.command('let g:epad_authors = 1')
+    elif vim.eval('g:epad_authors') == "0":
+        print "set to 1"
+        vim.command('let g:epad_authors = 1')
+    else:
+        print "set to 0"
+        vim.command('let g:epad_authors = 0')
+    pyepad_env['updated'] = True
+
+def _insert_enter():
+    print "insert enter"
+    pyepad_env['status_attr'] = vim.eval('g:epad_attributes')
+    pyepad_env['status_auth'] = vim.eval('g:epad_authors')
+    _toggle_attributes("0")
+    _toggle_authors("0")
+    for hilight in pyepad_env['colors']:
+        vim.command('syn clear %s' % hilight)
+    for i in pyepad_env['cursors']:
+        vim.command('call matchdelete(%s)' % (i))
+
+def _insert_leave():
+    print "insert leave"
+    _vim_to_epad_update()
+    _toggle_attributes(pyepad_env['status_attr'])
+    _toggle_authors(pyepad_env['status_auth'])
+
 EOS
 
 command! -nargs=* Etherpad :python _launch_epad(<f-args>)
@@ -275,5 +308,29 @@ command! -nargs=* EtherpadStop :python _stop_epad(<f-args>)
 command! -nargs=* EtherpadPause :python _pause_epad(<f-args>)
 command! -nargs=* EtherpadUpdate :python _vim_to_epad_update(<f-args>)
 command! -nargs=* EtherpadShowAttributes :python _toggle_attributes(<f-args>)
+command! -nargs=* EtherpadShowAuthors :python _toggle_authors(<f-args>)
 
+augroup EpadVim
+    au!
+    au InsertEnter * python _insert_enter()
+    au InsertLeave * python _insert_leave()
+    au CursorHold * call Timer()
+    au CursorHoldI * call ITimer()
+augroup END
+
+
+function! ITimer()
+  " K_IGNORE keycode does not work after version 7.2.025)
+  " there are numerous other keysequences that you can use
+  py _update_buffer()
+  py _vim_to_epad_update()
+endfunction
+
+function! Timer()
+    call feedkeys("f\e")
+  " K_IGNORE keycode does not work after version 7.2.025)
+  " there are numerous other keysequences that you can use
+  py _update_buffer()
+  py _vim_to_epad_update()
+endfunction
 
