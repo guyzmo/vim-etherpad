@@ -41,6 +41,7 @@ except ImportError:
 pyepad_env = {'epad': None,
               'text': None,
               'updated': False,
+              'new_rev': None,
               'updatetime': 0,
               'colors': [],
               'cursors': []}
@@ -73,6 +74,10 @@ def _update_buffer():
     """
     This function is polled by vim to updated its current buffer
     """
+    if pyepad_env['new_rev']:
+        pyepad_env['epad'].patch_text(*pyepad_env['new_rev'])
+        pyepad_env['new_rev'] = None
+
     if pyepad_env['updated']:
         text_obj = pyepad_env['text']
         text_str = pyepad_env['text'].decorated(style=Style.STYLES['Raw']())
