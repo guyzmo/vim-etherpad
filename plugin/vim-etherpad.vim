@@ -11,7 +11,7 @@ let g:epad_path = "p/"
 let g:epad_verbose = 0 " set to 1 for low verbosity, 2 for debug verbosity
 let g:epad_authors = 1 " set to 1 for showing authors
 let g:epad_attributes = 1 " set to 1 for showing attributes
-let g:epad_updatetime = 200
+let g:epad_updatetime = 1000
 
 python << EOS
 import difflib
@@ -31,11 +31,15 @@ except ImportError:
     from socketIO_client import SocketIO
     from py_etherpad import EtherpadIO, Style
 
+global pyepad_env
+global attr_trans
+
 pyepad_env = {'epad': None,
               'text': None,
               'updated': False,
               'new_rev': None,
               'updatetime': 0,
+              'insert': False,
               'disconnect': False,
               'colors': [],
               'cursors': []}
@@ -73,14 +77,18 @@ def _update_buffer():
     """
     This function is polled by vim to updated its current buffer
     """
+    print "update buffer", pyepad_env['updated']
+    print "disconnect", pyepad_env['disconnect']
+    print "new_rev", pyepad_env['new_rev']
     if pyepad_env['disconnect']:
-        vim.command('augroup! EpadVim')
+        vim.command('augroup! EpadHooks')
         vim.command('set updatetime='+pyepad_env['updatetime'])
-        vim.command('set buftype='+pyepad_env['buftype'])
+        #vim.command('set buftype='+pyepad_env['buftype'])
         for hilight in pyepad_env['colors']:
             vim.command('syn clear %s' % hilight)
         for i in pyepad_env['cursors']:
             vim.command('call matchdelete(%s)' % (i))
+        pyepad_env['disconnect'] = False
 
     if pyepad_env['new_rev']:
         pyepad_env['epad'].patch_text(*pyepad_env['new_rev'])
@@ -308,21 +316,44 @@ def _toggle_authors(*args):
     pyepad_env['updated'] = True
 
 def _insert_enter():
-    print "insert enter"
-    pyepad_env['status_attr'] = vim.eval('g:epad_attributes')
-    pyepad_env['status_auth'] = vim.eval('g:epad_authors')
-    _toggle_attributes("0")
-    _toggle_authors("0")
-    for hilight in pyepad_env['colors']:
-        vim.command('syn clear %s' % hilight)
-    for i in pyepad_env['cursors']:
-        vim.command('call matchdelete(%s)' % (i))
+    print
+    print "_insert_enter insert mode env:", pyepad_env['insert']
+    if not pyepad_env['insert']:
+        pyepad_env['insert'] = True
+        pyepad_env['status_attr'] = vim.eval('g:epad_attributes')
+        pyepad_env['status_auth'] = vim.eval('g:epad_authors')
+        _toggle_attributes("0")
+        _toggle_authors("0")
+        for hilight in pyepad_env['colors']:
+            vim.command('syn clear %s' % hilight)
+        for i in pyepad_env['cursors']:
+            vim.command('call matchdelete(%s)' % (i))
 
 def _insert_leave():
-    print "insert leave"
+    print
+    print "_insert_leave: insert mode env:", pyepad_env['insert']
+    if not pyepad_env['insert']:
+        print "insert leave"
+        _vim_to_epad_update()
+        _toggle_attributes(pyepad_env['status_attr'])
+        _toggle_authors(pyepad_env['status_auth'])
+
+def _timer():
+    # K_IGNORE keycode does not work after version 7.2.025)
+    # there are numerous other keysequences that you can use
+    if pyepad_env['insert']:
+        pyepad_env['insert'] = False
+        _insert_leave()
+    vim.command('call feedkeys("f\e")')
+    _update_buffer()
     _vim_to_epad_update()
-    _toggle_attributes(pyepad_env['status_attr'])
-    _toggle_authors(pyepad_env['status_auth'])
+
+def _insert_timer():
+    # K_IGNORE keycode does not work after version 7.2.025)
+    # there are numerous other keysequences that you can use
+    vim.command(':call feedkeys(\"\<C-o>f\e\")')
+    _vim_to_epad_update()
+    _update_buffer()
 
 EOS
 
@@ -334,31 +365,13 @@ command! -nargs=* EtherpadShowAttributes :python _toggle_attributes(<f-args>)
 command! -nargs=* EtherpadShowAuthors :python _toggle_authors(<f-args>)
 
 function! EpadHooks()
-    augroup EpadVim
+    augroup EpadHooks
         au!
         au InsertEnter * python _insert_enter()
         au InsertLeave * python _insert_leave()
-        au CursorHold * call Timer()
-        au CursorHoldI * call ITimer()
+        au CursorHold * python _timer()
+        au CursorHoldI * python _insert_timer()
     augroup END
 endfunction
 
-
-function! ITimer()
-  " K_IGNORE keycode does not work after version 7.2.025)
-  " there are numerous other keysequences that you can use
-  py _update_buffer()
-  py _vim_to_epad_update()
-endfunction
-
-function! Timer()
-    "call feedkeys("f\e")
-    call feedkeys("f\e")
-  " K_IGNORE keycode does not work after version 7.2.025)
-  " there are numerous other keysequences that you can use
-  print "update"
-  py _update_buffer()
-  print "send"
-  py _vim_to_epad_update()
-endfunction
 
