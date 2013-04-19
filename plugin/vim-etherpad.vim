@@ -20,10 +20,6 @@ import vim
 import sys
 import os
 
-def excepthook(*args):
-    print 'caught', args
-sys.excepthook = excepthook
-
 path = os.path.dirname(vim.eval('expand("<sfile>")'))
 
 try:
@@ -40,6 +36,7 @@ pyepad_env = {'epad': None,
               'updated': False,
               'new_rev': None,
               'updatetime': 0,
+              'disconnect': False,
               'colors': [],
               'cursors': []}
 
@@ -48,6 +45,11 @@ attr_trans = {'bold':          'bold',
               'underline':     'underline',
               'strikethrough': 'undercurl',
               'list':          'list'}
+
+def excepthook(*args):
+    pyepad_env['disconnect'] = True
+    print 'caught', args
+sys.excepthook = excepthook
 
 def calculate_fg(bg):
     # http://stackoverflow.com/questions/3942878/how-to-decide-font-color-in-white-or-black-depending-on-background-color
@@ -71,6 +73,15 @@ def _update_buffer():
     """
     This function is polled by vim to updated its current buffer
     """
+    if pyepad_env['disconnect']:
+        vim.command('augroup! EpadVim')
+        vim.command('set updatetime='+pyepad_env['updatetime'])
+        vim.command('set buftype='+pyepad_env['buftype'])
+        for hilight in pyepad_env['colors']:
+            vim.command('syn clear %s' % hilight)
+        for i in pyepad_env['cursors']:
+            vim.command('call matchdelete(%s)' % (i))
+
     if pyepad_env['new_rev']:
         pyepad_env['epad'].patch_text(*pyepad_env['new_rev'])
         pyepad_env['new_rev'] = None
@@ -210,9 +221,10 @@ def _launch_epad(padid=None, verbose=None, *args):
         callback function that is called by EtherpadLiteClient 
         on disconnection of the Etherpad Lite Server
         """
-        vim.command('echoerr "disconnected from Etherpad"')
-        vim.command('set updatetime='+pyepad_env['updatetime'])
-        vim.command('set buftype='+pyepad_env['buftype'])
+        vim.command('echohl ErrorMsg')
+        vim.command('echo "disconnected from Etherpad"')
+        vim.command('echohl None')
+        pyepad_env['disconnect'] = True
 
     try:
         pyepad_env['epad'] = EtherpadIO(padid, vim_link, host, path, port, 
@@ -223,10 +235,16 @@ def _launch_epad(padid=None, verbose=None, *args):
         if not pyepad_env['epad'].has_ended():
             vim.command('echomsg "connected to Etherpad: %s://%s:%s/%s%s"' % ('https' if secure else 'http', host, port, path, padid))
         else:
-            vim.command('echoerr "not connected to Etherpad"')
+            vim.command('echohl ErrorMsg')
+            vim.command('echo "not connected to Etherpad"')
+            vim.command('echohl None')
 
     except Exception, err:
-        vim.command('echoerr "Couldn\'t connect to Etherpad: %s://%s:%s/%s%s"' % ('https' if secure else 'http', host, port, path, padid))
+        vim.command('echohl ErrorMsg')
+        vim.command('echo "Couldn\'t connect to Etherpad: %s://%s:%s/%s%s"' % ('https' if secure else 'http', host, port, path, padid))
+        vim.command('echohl None')
+
+    vim.command('call EpadHooks()')
 
 def _pause_epad():
     """
@@ -235,17 +253,21 @@ def _pause_epad():
     if not pyepad_env['epad'].has_ended():
         pyepad_env['epad'].pause()
     else:
-        vim.command('echoerr "not connected to Etherpad"')
+        vim.command('echohl ErrorMsg')
+        vim.command('echo "not connected to Etherpad"')
+        vim.command('echohl None')
 
 def _vim_to_epad_update():
     """
     Function that sends all buffers updates to the EtherpadLite server
     """
-    if not pyepad_env['updated']:
-        if not pyepad_env['epad'].has_ended():
+    if not pyepad_env['updated'] and len(vim.current.buffer) > 1:
+        if not pyepad_env['epad'].has_ended() and pyepad_env['text']:
             pyepad_env['new_rev'] = (pyepad_env['text'], "\n".join(vim.current.buffer[:])+"\n")
         else:
-            vim.command('echoerr "not connected to Etherpad"')
+            vim.command('echohl ErrorMsg')
+            vim.command('echo "not connected to Etherpad"')
+            vim.command('echohl None')
 
 
 def _stop_epad(*args):
@@ -310,13 +332,15 @@ command! -nargs=* EtherpadUpdate :python _vim_to_epad_update(<f-args>)
 command! -nargs=* EtherpadShowAttributes :python _toggle_attributes(<f-args>)
 command! -nargs=* EtherpadShowAuthors :python _toggle_authors(<f-args>)
 
-augroup EpadVim
-    au!
-    au InsertEnter * python _insert_enter()
-    au InsertLeave * python _insert_leave()
-    au CursorHold * call Timer()
-    au CursorHoldI * call ITimer()
-augroup END
+function! EpadHooks()
+    augroup EpadVim
+        au!
+        au InsertEnter * python _insert_enter()
+        au InsertLeave * python _insert_leave()
+        au CursorHold * call Timer()
+        au CursorHoldI * call ITimer()
+    augroup END
+endfunction
 
 
 function! ITimer()
