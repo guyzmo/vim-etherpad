@@ -240,6 +240,7 @@ def _launch_epad(padid=None, verbose=None, *args):
             vim.command('echohl None')
 
     except Exception, err:
+        print err
         vim.command('echohl ErrorMsg')
         vim.command('echo "Couldn\'t connect to Etherpad: %s://%s:%s/%s%s"' % ('https' if secure else 'http', host, port, path, padid))
         vim.command('echohl None')
@@ -351,10 +352,13 @@ function! ITimer()
 endfunction
 
 function! Timer()
+    "call feedkeys("f\e")
     call feedkeys("f\e")
   " K_IGNORE keycode does not work after version 7.2.025)
   " there are numerous other keysequences that you can use
+  print "update"
   py _update_buffer()
+  print "send"
   py _vim_to_epad_update()
 endfunction
 
