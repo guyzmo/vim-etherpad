@@ -334,24 +334,21 @@ def _toggle_authors(*args): # {{{
 # }}}
 
 def _insert_enter(): # {{{
-    if not pyepad_env['insert']:
-        pyepad_env['insert'] = True
-        pyepad_env['status_attr'] = vim.eval('g:epad_attributes')
-        pyepad_env['status_auth'] = vim.eval('g:epad_authors')
-        _toggle_attributes("0")
-        _toggle_authors("0")
-        for hilight in pyepad_env['colors']:
-            vim.command('syn clear %s' % hilight)
-        for i in pyepad_env['cursors']:
-            vim.command('call matchdelete(%s)' % (i))
+    pyepad_env['insert'] = True
+    pyepad_env['status_attr'] = vim.eval('g:epad_attributes')
+    pyepad_env['status_auth'] = vim.eval('g:epad_authors')
+    _toggle_attributes("0")
+    _toggle_authors("0")
+    for hilight in pyepad_env['colors']:
+        vim.command('syn clear %s' % hilight)
+    for i in pyepad_env['cursors']:
+        vim.command('call matchdelete(%s)' % (i))
 # }}}
 
 def _insert_leave(): # {{{
-    if not pyepad_env['insert']:
-        print "insert leave"
-        _vim_to_epad_update()
-        _toggle_attributes(pyepad_env['status_attr'])
-        _toggle_authors(pyepad_env['status_auth'])
+    _vim_to_epad_update()
+    _toggle_attributes(pyepad_env['status_attr'])
+    _toggle_authors(pyepad_env['status_auth'])
 # }}}
 
 def _timer(): # {{{
@@ -359,12 +356,13 @@ def _timer(): # {{{
     # there are numerous other keysequences that you can use
     if not pyepad_env['epad'].has_ended():
         print "XXXXXXXXXXXXXX NORMAL", 
-        _vim_to_epad_update()
-        _update_buffer()
         if pyepad_env['insert']:
             pyepad_env['insert'] = False
             _insert_leave()
-        vim.command('call feedkeys("f\e")')
+        else:
+            _vim_to_epad_update()
+            _update_buffer()
+            vim.command('call feedkeys("f\e")')
 # }}}
 
 def _insert_timer(): # {{{
@@ -372,12 +370,13 @@ def _insert_timer(): # {{{
     # there are numerous other keysequences that you can use
     if not pyepad_env['epad'].has_ended():
         print "XXXXXXXXXXXXXX INSERT", 
-        _vim_to_epad_update()
-        _update_buffer()
         if not pyepad_env['insert']:
             pyepad_env['insert'] = True
             _insert_enter()
-        vim.command(':call feedkeys(\"\<C-o>f\e\")')
+        else:
+            _vim_to_epad_update()
+            _update_buffer()
+            vim.command(':call feedkeys(\"\<C-o>f\e\")')
 # }}}
 
 EOS
