@@ -44,6 +44,8 @@ pyepad_env = {'epad': None,
               'updatetime': 0,
               'insert': False,
               'disconnect': False,
+              'status_attr': False,
+              'status_auth': False,
               'colors': [],
               'cursors': []}
 
