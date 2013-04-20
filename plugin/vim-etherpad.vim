@@ -13,11 +13,12 @@ let g:epad_path = "p/"
 let g:epad_verbose = 0 " set to 1 for low verbosity, 2 for debug verbosity
 let g:epad_authors = 1 " set to 1 for showing authors
 let g:epad_attributes = 1 " set to 1 for showing attributes
-let g:epad_updatetime = 1000
+let g:epad_updatetime = 500
 
 python << EOS
 import difflib
 import logging
+log = logging.getLogger('vim_etherpad')
 import vim
 import sys
 import os
@@ -28,7 +29,7 @@ try:
     from socketIO_client import SocketIO
     from py_etherpad import EtherpadIO, Style
 except ImportError:
-    print "Import locally"
+    log.debug("Import locally")
     sys.path += [os.path.join(path, "../pylibs/socketIO-client/"), 
                  os.path.join(path, "../pylibs/PyEtherpadLite/src/")]
     from socketIO_client import SocketIO
@@ -57,7 +58,7 @@ attr_trans = {'bold':          'bold',
 
 def excepthook(*args): # {{{
     pyepad_env['disconnect'] = True
-    print 'caught', args
+    log.exception(args)
 sys.excepthook = excepthook
 # }}}
 
@@ -85,9 +86,7 @@ def _update_buffer(): # {{{
     """
     This function is polled by vim to updated its current buffer
     """
-    print "update buffer", pyepad_env['updated']
-    print "disconnect", pyepad_env['disconnect']
-    print "new_rev", pyepad_env['new_rev']
+    log.debug("_update_buffer(udated:%s, new_rev:'%s')" % (pyepad_env['updated'], pyepad_env['new_rev']))
     if pyepad_env['disconnect']:
         vim.command('augroup! EpadHooks')
         vim.command('set updatetime='+pyepad_env['updatetime'])
@@ -262,7 +261,7 @@ def _launch_epad(padid=None, verbose=None, *args): # {{{
             vim.command('echohl None')
 
     except Exception, err:
-        print err
+        log.exception(err)
         vim.command('echohl ErrorMsg')
         vim.command('echo "Couldn\'t connect to Etherpad: %s://%s:%s/%s%s"' % ('https' if secure else 'http', host, port, path, padid))
         vim.command('echohl None')
@@ -274,6 +273,7 @@ def _pause_epad(): # {{{
     """
     Function that pauses EtherpadLiteClient
     """
+    log.debug("_pause_epad()")
     if not pyepad_env['epad'].has_ended():
         pyepad_env['epad'].pause()
     else:
@@ -286,9 +286,12 @@ def _vim_to_epad_update(): # {{{
     """
     Function that sends all buffers updates to the EtherpadLite server
     """
+    log.debug("_vim_to_epad_update()")
     if not pyepad_env['updated'] and len(pyepad_env['buffer']) > 1:
         if not pyepad_env['epad'].has_ended() and pyepad_env['text']:
-            pyepad_env['new_rev'] = (pyepad_env['text'], "\n".join(pyepad_env['buffer'][:])+"\n")
+            if str(pyepad_env['text']) != "\n".join(pyepad_env['buffer'][:])+"\n":
+                vim.command('echomsg "sending update…"')
+                pyepad_env['new_rev'] = (pyepad_env['text'], "\n".join(pyepad_env['buffer'][:])+"\n")
         else:
             vim.command('echohl ErrorMsg')
             vim.command('echo "not connected to Etherpad"')
@@ -300,11 +303,13 @@ def _stop_epad(*args): # {{{
     """
     Function that disconnects EtherpadLiteClient from the server
     """
+    log.debug("_stop_epad()")
     if pyepad_env['epad'] and not pyepad_env['epad'].has_ended():
         pyepad_env['epad'].stop()
 # }}}
 
 def _toggle_attributes(*args): # {{{
+    log.debug("_toggle_attributes()")
     if len(args) > 0:
         if args[0] == "0":
             vim.command('let g:epad_attributes = 0')
@@ -318,67 +323,70 @@ def _toggle_attributes(*args): # {{{
 # }}}
 
 def _toggle_authors(*args): # {{{
-    print "AU", args
+    log.debug("_toggle_authors()")
     if len(args) > 0:
         if args[0] == "0":
-            print "set with arg to 0"
             vim.command('let g:epad_authors = 0')
         else:
-            print "set with arg to 1"
             vim.command('let g:epad_authors = 1')
     elif vim.eval('g:epad_authors') == "0":
-        print "set to 1"
         vim.command('let g:epad_authors = 1')
     else:
-        print "set to 0"
         vim.command('let g:epad_authors = 0')
     pyepad_env['updated'] = True
 # }}}
 
 def _insert_enter(): # {{{
-    pyepad_env['insert'] = True
-    pyepad_env['status_attr'] = vim.eval('g:epad_attributes')
-    pyepad_env['status_auth'] = vim.eval('g:epad_authors')
-    _toggle_attributes("0")
-    _toggle_authors("0")
-    for hilight in pyepad_env['colors']:
-        vim.command('syn clear %s' % hilight)
-    for i in pyepad_env['cursors']:
-        vim.command('call matchdelete(%s)' % (i))
+    log.debug("_insert_enter()")
+    if not pyepad_env['insert']:
+        pyepad_env['insert'] = True
+        pyepad_env['status_attr'] = vim.eval('g:epad_attributes')
+        pyepad_env['status_auth'] = vim.eval('g:epad_authors')
+        _toggle_attributes("0")
+        _toggle_authors("0")
+        for hilight in pyepad_env['colors']:
+            vim.command('syn clear %s' % hilight)
+        for i in pyepad_env['cursors']:
+            vim.command('call matchdelete(%s)' % (i))
 # }}}
 
-def _insert_leave(): # {{{
-    _vim_to_epad_update()
-    _toggle_attributes(pyepad_env['status_attr'])
-    _toggle_authors(pyepad_env['status_auth'])
+def _normal_enter(): # {{{
+    log.debug("_normal_enter()")
+    if pyepad_env['insert']:
+        pyepad_env['insert'] = False
+        _toggle_attributes(pyepad_env['status_attr'])
+        _toggle_authors(pyepad_env['status_auth'])
 # }}}
 
-def _timer(): # {{{
+def _normal_timer(): # {{{
+    log.debug("_normal_timer()")
     # K_IGNORE keycode does not work after version 7.2.025)
     # there are numerous other keysequences that you can use
     if not pyepad_env['epad'].has_ended():
-        print "XXXXXXXXXXXXXX NORMAL", 
-        if pyepad_env['insert']:
-            pyepad_env['insert'] = False
-            _insert_leave()
-        else:
-            _vim_to_epad_update()
-            _update_buffer()
-            vim.command('call feedkeys("f\e")')
+        _vim_to_epad_update()
+        _update_buffer()
+        vim.command('call feedkeys("f\e")')
+# }}}
+
+def _normal_hook():
+    log.debug("_normal_hook()")
+    if not pyepad_env['epad'].has_ended():
+        _vim_to_epad_update()
+
+def _insert_hook(): # {{{
+    log.debug("_insert_hook()")
+    if not pyepad_env['epad'].has_ended():
+        _vim_to_epad_update()
 # }}}
 
 def _insert_timer(): # {{{
-    # K_IGNORE keycode does not work after version 7.2.025)
-    # there are numerous other keysequences that you can use
+    log.debug("_insert_timer()")
     if not pyepad_env['epad'].has_ended():
-        print "XXXXXXXXXXXXXX INSERT", 
-        if not pyepad_env['insert']:
-            pyepad_env['insert'] = True
-            _insert_enter()
-        else:
-            _vim_to_epad_update()
-            _update_buffer()
-            vim.command(':call feedkeys(\"\<C-o>f\e\")')
+        _vim_to_epad_update()
+        _update_buffer()
+        # K_IGNORE keycode does not work after version 7.2.025)
+        # there are numerous other keysequences that you can use
+        vim.command(':call feedkeys("a\<Backspace>")')
 # }}}
 
 EOS
@@ -393,8 +401,12 @@ command! -nargs=* EtherpadShowAuthors :python _toggle_authors(<f-args>)
 function! EpadHooks()
     augroup EpadHooks
         au!
-        au CursorHold * python _timer()
-        au CursorHoldI * python _insert_timer()
+        au CursorHold *   python _normal_timer()
+        au InsertLeave *  python _normal_enter()
+        " au CursorMoved *  python _normal_hook()
+        au CursorHoldI *  python _insert_timer()
+        au InsertEnter *  python _insert_enter()
+        au CursorMovedI * python _insert_hook()
     augroup END
 endfunction
 
