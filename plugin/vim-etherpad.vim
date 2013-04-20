@@ -1,9 +1,11 @@
 
+" Avoid reloading
 if exists('g:loaded_vim_etherpad') || &cp
   finish
 endif
 let g:loaded_vim_etherpad = 1
 
+" Global configuration options
 let g:epad_pad = "test"
 let g:epad_host = "localhost"
 let g:epad_port = "9001"
@@ -26,6 +28,7 @@ try:
     from socketIO_client import SocketIO
     from py_etherpad import EtherpadIO, Style
 except ImportError:
+    print "Import locally"
     sys.path += [os.path.join(path, "../pylibs/socketIO-client/"), 
                  os.path.join(path, "../pylibs/PyEtherpadLite/src/")]
     from socketIO_client import SocketIO
@@ -50,20 +53,22 @@ attr_trans = {'bold':          'bold',
               'strikethrough': 'undercurl',
               'list':          'list'}
 
-def excepthook(*args):
+def excepthook(*args): # {{{
     pyepad_env['disconnect'] = True
     print 'caught', args
 sys.excepthook = excepthook
+# }}}
 
-def calculate_fg(bg):
+def calculate_fg(bg): # {{{
     # http://stackoverflow.com/questions/3942878/how-to-decide-font-color-in-white-or-black-depending-on-background-color
     if bg.startswith('#'):
         r, g, b = (int(bg[1:3], 16), int(bg[3:5], 16), int(bg[5:-1], 16))
         if (r*0.299+b*0.587+g*0.114) > 50:
             return "#000000"
     return "#ffffff"
+# }}}
 
-def calculate_bright(color):
+def calculate_bright(color): # {{{
     if color.startswith('#'):
         r, g, b =  (int(color[1:3], 16)+64, int(color[3:5], 16)+64, int(color[5:], 16)+64)
         if r > 255: r = 0xff
@@ -71,9 +76,10 @@ def calculate_bright(color):
         if b > 255: b = 0xff
         return "#%02x%02x%02x" % (r, g, b)
     return "#000000"
+# }}}
         
 
-def _update_buffer():
+def _update_buffer(): # {{{
     """
     This function is polled by vim to updated its current buffer
     """
@@ -158,8 +164,9 @@ def _update_buffer():
                 c = 1
         vim.command('redraw!')
         pyepad_env['updated'] = False
+# }}}
 
-def _launch_epad(padid=None, verbose=None, *args):
+def _launch_epad(padid=None, verbose=None, *args): # {{{
     """
     launches EtherpadLiteClient
     """
@@ -237,7 +244,7 @@ def _launch_epad(padid=None, verbose=None, *args):
     try:
         pyepad_env['epad'] = EtherpadIO(padid, vim_link, host, path, port, 
                                         secure, verbose, 
-                                        transports=['websocket', 'xhr-polling'], 
+                                        transports=['websocket', 'xhr-polling'], #, 'jsonp-polling'], 
                                         disc_cb=on_disconnect)
 
         if not pyepad_env['epad'].has_ended():
@@ -254,8 +261,9 @@ def _launch_epad(padid=None, verbose=None, *args):
         vim.command('echohl None')
 
     vim.command('call EpadHooks()')
+# }}}
 
-def _pause_epad():
+def _pause_epad(): # {{{
     """
     Function that pauses EtherpadLiteClient
     """
@@ -265,8 +273,9 @@ def _pause_epad():
         vim.command('echohl ErrorMsg')
         vim.command('echo "not connected to Etherpad"')
         vim.command('echohl None')
+# }}}
 
-def _vim_to_epad_update():
+def _vim_to_epad_update(): # {{{
     """
     Function that sends all buffers updates to the EtherpadLite server
     """
@@ -277,16 +286,18 @@ def _vim_to_epad_update():
             vim.command('echohl ErrorMsg')
             vim.command('echo "not connected to Etherpad"')
             vim.command('echohl None')
+# }}}
 
 
-def _stop_epad(*args):
+def _stop_epad(*args): # {{{
     """
     Function that disconnects EtherpadLiteClient from the server
     """
     if pyepad_env['epad'] and not pyepad_env['epad'].has_ended():
         pyepad_env['epad'].stop()
+# }}}
 
-def _toggle_attributes(*args):
+def _toggle_attributes(*args): # {{{
     if len(args) > 0:
         if args[0] == "0":
             vim.command('let g:epad_attributes = 0')
@@ -297,8 +308,9 @@ def _toggle_attributes(*args):
     else:
         vim.command('let g:epad_attributes = 0')
     pyepad_env['updated'] = True
+# }}}
 
-def _toggle_authors(*args):
+def _toggle_authors(*args): # {{{
     print "AU", args
     if len(args) > 0:
         if args[0] == "0":
@@ -314,10 +326,9 @@ def _toggle_authors(*args):
         print "set to 0"
         vim.command('let g:epad_authors = 0')
     pyepad_env['updated'] = True
+# }}}
 
-def _insert_enter():
-    print
-    print "_insert_enter insert mode env:", pyepad_env['insert']
+def _insert_enter(): # {{{
     if not pyepad_env['insert']:
         pyepad_env['insert'] = True
         pyepad_env['status_attr'] = vim.eval('g:epad_attributes')
@@ -328,15 +339,15 @@ def _insert_enter():
             vim.command('syn clear %s' % hilight)
         for i in pyepad_env['cursors']:
             vim.command('call matchdelete(%s)' % (i))
+# }}}
 
-def _insert_leave():
-    print
-    print "_insert_leave: insert mode env:", pyepad_env['insert']
+def _insert_leave(): # {{{
     if not pyepad_env['insert']:
         print "insert leave"
         _vim_to_epad_update()
         _toggle_attributes(pyepad_env['status_attr'])
         _toggle_authors(pyepad_env['status_auth'])
+# }}}
 
 def _timer(): # {{{
     # K_IGNORE keycode does not work after version 7.2.025)
@@ -376,11 +387,9 @@ command! -nargs=* EtherpadShowAuthors :python _toggle_authors(<f-args>)
 function! EpadHooks()
     augroup EpadHooks
         au!
-        au InsertEnter * python _insert_enter()
-        au InsertLeave * python _insert_leave()
         au CursorHold * python _timer()
         au CursorHoldI * python _insert_timer()
     augroup END
 endfunction
 
-
+" vim: set fdm=marker ts=4 sw=4
