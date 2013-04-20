@@ -338,22 +338,31 @@ def _insert_leave():
         _toggle_attributes(pyepad_env['status_attr'])
         _toggle_authors(pyepad_env['status_auth'])
 
-def _timer():
+def _timer(): # {{{
     # K_IGNORE keycode does not work after version 7.2.025)
     # there are numerous other keysequences that you can use
-    if pyepad_env['insert']:
-        pyepad_env['insert'] = False
-        _insert_leave()
-    vim.command('call feedkeys("f\e")')
-    _update_buffer()
-    _vim_to_epad_update()
+    if not pyepad_env['epad'].has_ended():
+        print "XXXXXXXXXXXXXX NORMAL", 
+        _vim_to_epad_update()
+        _update_buffer()
+        if pyepad_env['insert']:
+            pyepad_env['insert'] = False
+            _insert_leave()
+        vim.command('call feedkeys("f\e")')
+# }}}
 
-def _insert_timer():
+def _insert_timer(): # {{{
     # K_IGNORE keycode does not work after version 7.2.025)
     # there are numerous other keysequences that you can use
-    vim.command(':call feedkeys(\"\<C-o>f\e\")')
-    _vim_to_epad_update()
-    _update_buffer()
+    if not pyepad_env['epad'].has_ended():
+        print "XXXXXXXXXXXXXX INSERT", 
+        _vim_to_epad_update()
+        _update_buffer()
+        if not pyepad_env['insert']:
+            pyepad_env['insert'] = True
+            _insert_enter()
+        vim.command(':call feedkeys(\"\<C-o>f\e\")')
+# }}}
 
 EOS
 
