@@ -103,7 +103,7 @@ def _update_buffer(): # {{{
     if pyepad_env['updated']:
         text_obj = pyepad_env['text']
         text_str = pyepad_env['text'].decorated(style=Style.STYLES['Raw']())
-        vim.current.buffer[:] = [l.encode('utf-8') for l in text_str.splitlines()]
+        pyepad_env['buffer'][:] = [l.encode('utf-8') for l in text_str.splitlines()]
         c, l = (1, 1)
         for hilight in pyepad_env['colors']:
             vim.command('syn clear %s' % hilight)
@@ -244,6 +244,7 @@ def _launch_epad(padid=None, verbose=None, *args): # {{{
     pyepad_env['updatetime'] = vim.eval('&updatetime')
     vim.command('set updatetime='+vim.eval('g:epad_updatetime'))
 
+    pyepad_env['buffer'] = vim.current.buffer
 
     try:
         pyepad_env['epad'] = EtherpadIO(padid, vim_link, host, path, port, 
@@ -283,9 +284,9 @@ def _vim_to_epad_update(): # {{{
     """
     Function that sends all buffers updates to the EtherpadLite server
     """
-    if not pyepad_env['updated'] and len(vim.current.buffer) > 1:
+    if not pyepad_env['updated'] and len(pyepad_env['buffer']) > 1:
         if not pyepad_env['epad'].has_ended() and pyepad_env['text']:
-            pyepad_env['new_rev'] = (pyepad_env['text'], "\n".join(vim.current.buffer[:])+"\n")
+            pyepad_env['new_rev'] = (pyepad_env['text'], "\n".join(pyepad_env['buffer'][:])+"\n")
         else:
             vim.command('echohl ErrorMsg')
             vim.command('echo "not connected to Etherpad"')
