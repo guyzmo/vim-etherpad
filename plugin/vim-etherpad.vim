@@ -170,7 +170,7 @@ def _launch_epad(padid=None, verbose=None, *args): # {{{
     """
     launches EtherpadLiteClient
     """
-    def parse_args(padid):
+    def parse_args(padid): # {{{
         protocol, padid = padid.split('://')
         secure = False
         port = "80"
@@ -186,6 +186,28 @@ def _launch_epad(padid=None, verbose=None, *args): # {{{
             path = "/".join(padid[1:-1])+'/'
         padid = padid[-1]
         return secure, host, port, path, padid
+    # }}}
+
+    def vim_link(text): # {{{
+        """
+        callback function that is called by EtherpadLiteClient
+        it stores the last updated text
+        """
+        if not text is None:
+            pyepad_env['text'] = text
+            pyepad_env['updated'] = True
+    # }}}
+
+    def on_disconnect(): # {{{
+        """
+        callback function that is called by EtherpadLiteClient 
+        on disconnection of the Etherpad Lite Server
+        """
+        vim.command('echohl ErrorMsg')
+        vim.command('echo "disconnected from Etherpad"')
+        vim.command('echohl None')
+        pyepad_env['disconnect'] = True
+    # }}}
 
     host = vim.eval('g:epad_host')
     port = vim.eval('g:epad_port')
@@ -222,24 +244,6 @@ def _launch_epad(padid=None, verbose=None, *args): # {{{
     pyepad_env['updatetime'] = vim.eval('&updatetime')
     vim.command('set updatetime='+vim.eval('g:epad_updatetime'))
 
-    def vim_link(text):
-        """
-        callback function that is called by EtherpadLiteClient
-        it stores the last updated text
-        """
-        if not text is None:
-            pyepad_env['text'] = text
-            pyepad_env['updated'] = True
-
-    def on_disconnect():
-        """
-        callback function that is called by EtherpadLiteClient 
-        on disconnection of the Etherpad Lite Server
-        """
-        vim.command('echohl ErrorMsg')
-        vim.command('echo "disconnected from Etherpad"')
-        vim.command('echohl None')
-        pyepad_env['disconnect'] = True
 
     try:
         pyepad_env['epad'] = EtherpadIO(padid, vim_link, host, path, port, 
