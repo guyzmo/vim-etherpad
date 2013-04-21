@@ -13,10 +13,11 @@ Click me for a demo video of good quality](http://m0g.net/vim-etherpad/)
 # Disclaimer
 
 As is, the plugin is only a Proof-of-Concept, that is still not configurable and not fail-proof.
-It can only get updates from the server, but still not send updates to the server.
-The Vim integration is still pretty… alpha.
+It can get updates from the server, and generate/send changeset to the server, but that part is still pretty buggy.
+The Vim integration ready to be tested, though still in beta phase. It can happen that a typed change will revert.
 
 Supports pad connection using `websocket` flawlessly, but `xhr-polling` is still beta (it may need several reconnections to work).
+`json-polling` has been implemented, but does not still work. See [SocketIO-client](https://github.com/guyzmo/SocketIO-client) for more.
 
 # Develop
 
@@ -36,10 +37,14 @@ To run the plugin for dev or testing, you can launch vim as follows:
     let g:epad_host = "localhost" " Hostname to connect to
     let g:epad_port = "9001"      " Port to connect to
     let g:epad_path = "p/"        " URL Path to the pad
-    let g:epad_pad = "foo"        " Name of the pad to connect to
+    let g:epad_pad = "test"       " Name of the pad to connect to
     
+    " GUI feel
     let g:epad_updatetime = 1000  " lower this for more realtime, higher this for less load
-    let g:epad_attributes = 0     " set to 1 to display attributes (works only with a fonth that)
+
+    " GUI look
+    let g:epad_attributes = 0     " set to 1 to display attributes (works only with a font that)
+    let g:epad_authors = 0        " set to 1 to display authors (works only in gui mode)
 
     " Enable verbosity
     let g:epad_verbose = 0        " set to 1 for INFO level, 2 for DEBUG level
@@ -72,6 +77,12 @@ make some edits and then:
     :EtherpadShowAttributes   " toggle attributes
     :EtherpadShowAttributes 0 " disable attributes
     :EtherpadShowAttributes 1 " show attributes
+
+## The same with authors:
+
+    :EtherpadShowAuthors   " toggle authors
+    :EtherpadShowAuthors 0 " disable authors
+    :EtherpadShowAuthors 1 " show authors
 
 # Install
 
