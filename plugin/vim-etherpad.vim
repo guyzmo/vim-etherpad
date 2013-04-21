@@ -59,7 +59,8 @@ attr_trans = {'bold':          'bold',
 
 def excepthook(*args): # {{{
     pyepad_env['disconnect'] = True
-    log.exception("exception caught: disconnect", exc_info=args)
+    vim.command('au! EpadHooks')
+    log.error("exception caught: disconnect", exc_info=args)
 sys.excepthook = excepthook
 # }}}
 
@@ -345,7 +346,7 @@ def _toggle_authors(*args): # {{{
 
 # {{{
 def _detect_and_update_change():
-    if not pyepad_env['epad'].has_ended():
+    if pyepad_env['epad'] and not pyepad_env['epad'].has_ended():
         if pyepad_env['insert']:
             check = lambda: vim.eval('b:changedtick') != str(int(pyepad_env['changedtick'])+2)
         else:
