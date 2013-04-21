@@ -106,6 +106,9 @@ def _update_buffer(): # {{{
         text_obj = pyepad_env['text']
         text_str = pyepad_env['text'].decorated(style=Style.STYLES['Raw']())
         pyepad_env['buffer'][:] = [l.encode('utf-8') for l in text_str.splitlines()]
+        if pyepad_env['insert']:
+            vim.command('set buftype=nofile')
+        vim.command("set nomodified")
         c, l = (1, 1)
         for hilight in pyepad_env['colors']:
             vim.command('syn clear %s' % hilight)
@@ -241,8 +244,8 @@ def _launch_epad(padid=None, verbose=None, *args): # {{{
     # disable cursorcolumn and cursorline that interferes with syntax
     vim.command('set nocursorcolumn')
     vim.command('set nocursorline')
-    pyepad_env['buftype'] = vim.eval('&buftype')
-    vim.command('set buftype=nofile')
+    #pyepad_env['buftype'] = vim.eval('&buftype')
+    #vim.command('set buftype=nofile')
     pyepad_env['updatetime'] = vim.eval('&updatetime')
     vim.command('set updatetime='+vim.eval('g:epad_updatetime'))
     pyepad_env['changedtick'] = vim.eval('b:changedtick')
@@ -292,7 +295,9 @@ def _vim_to_epad_update(): # {{{
     if not pyepad_env['updated'] and len(pyepad_env['buffer']) > 1:
         if not pyepad_env['epad'].has_ended() and pyepad_env['text']:
             if str(pyepad_env['text']) != "\n".join(pyepad_env['buffer'][:])+"\n":
-                vim.command('echomsg "sending update…"')
+                if pyepad_env['insert']:
+                    vim.command('set buftype=')
+                vim.command("set modified")
                 pyepad_env['new_rev'] = (pyepad_env['text'], "\n".join(pyepad_env['buffer'][:])+"\n")
         else:
             vim.command('echohl ErrorMsg')
@@ -338,24 +343,9 @@ def _toggle_authors(*args): # {{{
     pyepad_env['updated'] = True
 # }}}
 
-def _insert_enter(): # {{{
-    log.debug("_insert_enter()")
-    if not pyepad_env['insert']:
-        pyepad_env['insert'] = True
-        pyepad_env['status_attr'] = vim.eval('g:epad_attributes')
-        pyepad_env['status_auth'] = vim.eval('g:epad_authors')
-        _toggle_attributes("0")
-        _toggle_authors("0")
-        for hilight in pyepad_env['colors']:
-            vim.command('syn clear %s' % hilight)
-        for i in pyepad_env['cursors']:
-            vim.command('call matchdelete(%s)' % (i))
-# }}}
-
 # {{{
 def _detect_and_update_change():
     if not pyepad_env['epad'].has_ended():
-        print vim.eval('b:changedtick'), pyepad_env['changedtick']
         if pyepad_env['insert']:
             check = lambda: vim.eval('b:changedtick') != str(int(pyepad_env['changedtick'])+2)
         else:
@@ -370,12 +360,28 @@ def _detect_and_update_change():
 
 # }}}
 
+def _insert_enter(): # {{{
+    log.debug("_insert_enter()")
+    if not pyepad_env['insert']:
+        pyepad_env['insert'] = True
+        pyepad_env['status_attr'] = vim.eval('g:epad_attributes')
+        pyepad_env['status_auth'] = vim.eval('g:epad_authors')
+        _toggle_attributes("0")
+        _toggle_authors("0")
+        for hilight in pyepad_env['colors']:
+            vim.command('syn clear %s' % hilight)
+        for i in pyepad_env['cursors']:
+            vim.command('call matchdelete(%s)' % (i))
+        vim.command('set buftype=nofile')
+# }}}
+
 def _normal_enter(): # {{{
     log.debug("_normal_enter()")
     if pyepad_env['insert']:
         pyepad_env['insert'] = False
         _toggle_attributes(pyepad_env['status_attr'])
         _toggle_authors(pyepad_env['status_auth'])
+        vim.command('set buftype=')
 # }}}
 
 def _normal_timer(): # {{{
