@@ -44,6 +44,7 @@ pyepad_env = {'epad': None,
               'new_rev': None,
               'updatetime': 0,
               'insert': False,
+              'changedtick': 0,
               'disconnect': False,
               'status_attr': False,
               'status_auth': False,
@@ -58,7 +59,7 @@ attr_trans = {'bold':          'bold',
 
 def excepthook(*args): # {{{
     pyepad_env['disconnect'] = True
-    log.exception(args)
+    log.exception("exception caught: disconnect", exc_info=args)
 sys.excepthook = excepthook
 # }}}
 
@@ -244,6 +245,7 @@ def _launch_epad(padid=None, verbose=None, *args): # {{{
     vim.command('set buftype=nofile')
     pyepad_env['updatetime'] = vim.eval('&updatetime')
     vim.command('set updatetime='+vim.eval('g:epad_updatetime'))
+    pyepad_env['changedtick'] = vim.eval('b:changedtick')
 
     pyepad_env['buffer'] = vim.current.buffer
 
@@ -350,6 +352,24 @@ def _insert_enter(): # {{{
             vim.command('call matchdelete(%s)' % (i))
 # }}}
 
+# {{{
+def _detect_and_update_change():
+    if not pyepad_env['epad'].has_ended():
+        print vim.eval('b:changedtick'), pyepad_env['changedtick']
+        if pyepad_env['insert']:
+            check = lambda: vim.eval('b:changedtick') != str(int(pyepad_env['changedtick'])+2)
+        else:
+            check = lambda: vim.eval('b:changedtick') != pyepad_env['changedtick']
+        if check():
+            pyepad_env['changedtick'] = vim.eval('b:changedtick')
+            _vim_to_epad_update()
+        else:
+            _update_buffer()
+        return True
+    return False
+
+# }}}
+
 def _normal_enter(): # {{{
     log.debug("_normal_enter()")
     if pyepad_env['insert']:
@@ -362,28 +382,13 @@ def _normal_timer(): # {{{
     log.debug("_normal_timer()")
     # K_IGNORE keycode does not work after version 7.2.025)
     # there are numerous other keysequences that you can use
-    if not pyepad_env['epad'].has_ended():
-        _vim_to_epad_update()
-        _update_buffer()
+    if _detect_and_update_change():
         vim.command('call feedkeys("f\e")')
-# }}}
-
-def _normal_hook():
-    log.debug("_normal_hook()")
-    if not pyepad_env['epad'].has_ended():
-        _vim_to_epad_update()
-
-def _insert_hook(): # {{{
-    log.debug("_insert_hook()")
-    if not pyepad_env['epad'].has_ended():
-        _vim_to_epad_update()
 # }}}
 
 def _insert_timer(): # {{{
     log.debug("_insert_timer()")
-    if not pyepad_env['epad'].has_ended():
-        _vim_to_epad_update()
-        _update_buffer()
+    if _detect_and_update_change():
         # K_IGNORE keycode does not work after version 7.2.025)
         # there are numerous other keysequences that you can use
         vim.command(':call feedkeys("a\<Backspace>")')
@@ -403,10 +408,10 @@ function! EpadHooks()
         au!
         au CursorHold *   python _normal_timer()
         au InsertLeave *  python _normal_enter()
-        " au CursorMoved *  python _normal_hook()
+        au CursorMoved *  python _detect_and_update_change()
         au CursorHoldI *  python _insert_timer()
         au InsertEnter *  python _insert_enter()
-        au CursorMovedI * python _insert_hook()
+        au CursorMovedI * python _detect_and_update_change()
     augroup END
 endfunction
 
