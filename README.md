@@ -6,7 +6,7 @@ to a pad on an [EtherPadLite server](https://github.com/ether/etherpad-lite) and
 <video width="500" controls>
 <source src="http://m0g.net/vim-etherpad-screencast.mp4" type="video/mp4">
 <source src="http://m0g.net/vim-etherpad-screencast.ogv" type="video/ogg">
-[![Demo](http://m0g.net/vim-etherpad-screencast.gif)<br />
+[![Demo](https://i.imgur.com/SAqsy1F.gif)<br />
 Click me for a demo video of good quality](http://m0g.net/vim-etherpad/)
 </video>
 
